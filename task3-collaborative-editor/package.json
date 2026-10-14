@@ -1,0 +1,1 @@
+{"name":"elitech-task3-editor","version":"1.0.0","private":true,"scripts":{"start":"node server.js"},"dependencies":{"express":"^4.21.2","mongoose":"^8.9.5","socket.io":"^4.8.1"}}

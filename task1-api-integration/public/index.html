@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Explorer — EliteTech Task 1</title>
+  <style>
+    :root { --bg:#08111f; --card:#101d31; --muted:#91a4bd; --text:#f7fbff; --accent:#58c7ff; --accent2:#8c7bff; --danger:#ff7c8d; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:radial-gradient(circle at 10% 10%,#172b4d,transparent 40%),radial-gradient(circle at 90% 20%,#282050,transparent 35%),var(--bg); min-height:100vh; }
+    .wrap { width:min(1100px,92%); margin:auto; padding:40px 0 60px; }
+    header { display:flex; justify-content:space-between; gap:20px; align-items:end; margin-bottom:28px; }
+    h1 { margin:0; font-size:clamp(2rem,5vw,4rem); letter-spacing:-.05em; }
+    .sub { color:var(--muted); max-width:600px; line-height:1.6; }
+    form { display:flex; gap:10px; margin:20px 0; }
+    input,button { border:0; border-radius:14px; padding:14px 16px; font-size:1rem; }
+    input { flex:1; background:#fff; color:#111; min-width:0; }
+    button { cursor:pointer; color:white; background:linear-gradient(135deg,var(--accent),var(--accent2)); font-weight:800; }
+    button:disabled { opacity:.5; cursor:wait; }
+    #status { min-height:26px; color:var(--muted); }
+    .hero,.grid { display:grid; gap:16px; }
+    .hero { grid-template-columns:1.3fr .7fr; margin-top:20px; }
+    .grid { grid-template-columns:repeat(5,1fr); }
+    .card { background:rgba(16,29,49,.84); border:1px solid rgba(255,255,255,.08); border-radius:22px; padding:22px; box-shadow:0 18px 50px rgba(0,0,0,.22); backdrop-filter:blur(12px); }
+    .big { font-size:4rem; font-weight:900; letter-spacing:-.06em; }
+    .muted { color:var(--muted); }
+    .label { font-size:.82rem; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+    .forecast { margin-top:18px; }
+    .forecast h2 { margin-bottom:14px; }
+    .day { min-width:0; }
+    .day strong { display:block; margin:8px 0; }
+    .error { color:#ffd2d8; background:rgba(255,65,90,.12); border:1px solid rgba(255,65,90,.25); padding:12px 14px; border-radius:12px; }
+    @media (max-width:800px){ .hero{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)} header{display:block} }
+    @media (max-width:480px){ form{flex-direction:column}.grid{grid-template-columns:1fr}.big{font-size:3rem} }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><div class="label">EliteTech Intern · Task 1</div><h1>Weather Explorer</h1></div>
+    <p class="sub">Search a city and load live weather data dynamically from a public API.</p>
+  </header>
+  <form id="searchForm">
+    <input id="cityInput" value="Varanasi" placeholder="Enter a city, e.g. Lucknow" aria-label="City">
+    <button id="searchBtn">Get Weather</button>
+  </form>
+  <div id="status"></div>
+  <section id="weather" hidden>
+    <div class="hero">
+      <article class="card">
+        <div class="label" id="place">—</div>
+        <div class="big" id="temperature">—</div>
+        <div id="condition">—</div>
+        <p class="muted" id="updated">—</p>
+      </article>
+      <article class="card">
+        <div class="label">Current conditions</div>
+        <div class="grid" style="grid-template-columns:repeat(2,1fr);margin-top:16px">
+          <div><div class="label">Feels like</div><strong id="feels">—</strong></div>
+          <div><div class="label">Humidity</div><strong id="humidity">—</strong></div>
+          <div><div class="label">Wind</div><strong id="wind">—</strong></div>
+          <div><div class="label">Timezone</div><strong id="timezone">—</strong></div>
+        </div>
+      </article>
+    </div>
+    <div class="forecast"><h2>5-day forecast</h2><div id="forecastGrid" class="grid"></div></div>
+  </section>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const weatherCodes = {0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',71:'Light snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Rain showers',82:'Heavy rain showers',95:'Thunderstorm',96:'Thunderstorm + hail',99:'Thunderstorm + hail'};
+
+  async function getJSON(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    return response.json();
+  }
+
+  async function loadWeather(city) {
+    $('searchBtn').disabled = true;
+    $('status').textContent = 'Searching for the city…';
+    $('weather').hidden = true;
+    try {
+      const geo = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+      if (!geo.results?.length) throw new Error('City not found. Try another city name.');
+      const location = geo.results[0];
+      $('status').textContent = 'Loading weather…';
+      const url = new URL('https://api.open-meteo.com/v1/forecast');
+      url.search = new URLSearchParams({
+        latitude: location.latitude, longitude: location.longitude,
+        current: 'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m',
+        daily: 'weather_code,temperature_2m_max,temperature_2m_min',
+        forecast_days: '5', timezone: 'auto'
+      });
+      const data = await getJSON(url);
+      const c = data.current;
+      $('place').textContent = `${location.name}${location.admin1 ? ', ' + location.admin1 : ''}, ${location.country}`;
+      $('temperature').textContent = `${Math.round(c.temperature_2m)}°C`;
+      $('condition').textContent = weatherCodes[c.weather_code] || `Weather code ${c.weather_code}`;
+      $('updated').textContent = `Updated: ${c.time.replace('T',' ')} · ${data.timezone}`;
+      $('feels').textContent = `${Math.round(c.apparent_temperature)}°C`;
+      $('humidity').textContent = `${c.relative_humidity_2m}%`;
+      $('wind').textContent = `${Math.round(c.wind_speed_10m)} km/h`;
+      $('timezone').textContent = data.timezone;
+      $('forecastGrid').innerHTML = data.daily.time.map((date,i) => {
+        const day = new Date(`${date}T12:00:00`).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+        return `<article class="card day"><div class="label">${day}</div><strong>${weatherCodes[data.daily.weather_code[i]] || 'Weather'}</strong><div>${Math.round(data.daily.temperature_2m_max[i])}° / ${Math.round(data.daily.temperature_2m_min[i])}°C</div></article>`;
+      }).join('');
+      $('status').textContent = '';
+      $('weather').hidden = false;
+    } catch (error) {
+      $('status').innerHTML = `<div class="error">${error.message}</div>`;
+    } finally { $('searchBtn').disabled = false; }
+  }
+
+  $('searchForm').addEventListener('submit', (event) => { event.preventDefault(); const city = $('cityInput').value.trim(); if (city) loadWeather(city); });
+  loadWeather('Varanasi');
+</script>
+</body>
+</html>

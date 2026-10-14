@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "EliteTech Productivity Tracker",
+  "version": "1.0.0",
+  "description": "Tracks active website time and sends privacy-conscious hostname analytics to a local backend.",
+  "permissions": ["tabs", "storage", "alarms", "idle"],
+  "host_permissions": ["http://localhost:3004/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "EliteTech Productivity Tracker", "default_popup": "popup.html" }
+}

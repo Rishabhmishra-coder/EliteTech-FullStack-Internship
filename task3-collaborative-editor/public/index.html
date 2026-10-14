@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CollabPad</title><style>*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:#eef2f7;color:#152238}.shell{width:min(1100px,94%);margin:4vh auto;background:white;border-radius:24px;overflow:hidden;box-shadow:0 24px 70px #17243a25}.bar{padding:16px 20px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #dbe3ef}.brand{font-weight:900;margin-right:auto}.bar input{border:1px solid #dbe3ef;border-radius:10px;padding:9px 10px}.bar button{border:0;border-radius:10px;padding:10px 14px;background:#4f46e5;color:white;font-weight:800;cursor:pointer}.info{padding:9px 20px;color:#687892;font-size:.85rem;border-bottom:1px solid #eef2f7}.editor{min-height:68vh;padding:28px}.title{font-size:2rem;font-weight:900;border:0;outline:0;width:100%;margin-bottom:18px}.content{width:100%;min-height:52vh;border:0;outline:0;resize:vertical;font:1.05rem/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.presence{color:#4f46e5;font-weight:700}@media(max-width:650px){.bar{flex-wrap:wrap}.brand{width:100%}.editor{padding:20px}.title{font-size:1.5rem}}</style></head><body><div id="root"></div>
+<script src="/socket.io/socket.io.js"></script><script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script><script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script>
+// React provides the required dynamic UI framework; Socket.IO provides the real-time collaboration channel.
+const {useEffect,useState,useRef}=React;const socket=io();
+function App(){
+  const params=new URLSearchParams(location.search); const [docId,setDocId]=useState(params.get('doc')||'demo'); const [userName,setUserName]=useState('Guest');
+  const [title,setTitle]=useState('Untitled document'); const [content,setContent]=useState(''); const [info,setInfo]=useState('Not connected'); const joined=useRef(false); const timer=useRef(null);
+  useEffect(()=>{const loaded=doc=>{setTitle(doc.title);setContent(doc.content);setInfo('Loaded · changes sync live')};const update=doc=>{setTitle(doc.title);setContent(doc.content);setInfo('Updated by collaborator')};const presence=p=>setInfo(`${p.userName} ${p.action} this document`);socket.on('document-loaded',loaded);socket.on('document-update',update);socket.on('presence',presence);return()=>{socket.off('document-loaded',loaded);socket.off('document-update',update);socket.off('presence',presence)}},[]);
+  function join(){const id=docId.trim()||'demo',name=userName.trim()||'Guest';socket.emit('join-document',{documentId:id,userName:name});joined.current=true;setInfo(`Connected to document “${id}”`);history.replaceState(null,'',`?doc=${encodeURIComponent(id)}`)}
+  function changeTitle(v){setTitle(v);scheduleSave(v,content)} function changeContent(v){setContent(v);scheduleSave(title,v)}
+  function scheduleSave(t,c){if(!joined.current)return;clearTimeout(timer.current);setInfo('Saving…');timer.current=setTimeout(()=>{socket.emit('document-change',{title:t,content:c});setInfo('Saved · changes sync live')},250)}
+  useEffect(()=>{join();return()=>clearTimeout(timer.current)},[]);
+  return React.createElement('div',{className:'shell'},
+    React.createElement('div',{className:'bar'},React.createElement('div',{className:'brand'},'📝 CollabPad'),React.createElement('input',{value:docId,onChange:e=>setDocId(e.target.value),placeholder:'Document ID'}),React.createElement('input',{value:userName,onChange:e=>setUserName(e.target.value),placeholder:'Your name'}),React.createElement('button',{onClick:join},'Join')),
+    React.createElement('div',{className:'info'},info),
+    React.createElement('main',{className:'editor'},React.createElement('input',{className:'title',value:title,onChange:e=>changeTitle(e.target.value)}),React.createElement('textarea',{className:'content',value:content,onChange:e=>changeContent(e.target.value),placeholder:'Start writing…'}))
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script></body></html>
